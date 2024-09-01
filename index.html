@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 320px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #result {
+            font-size: 18px;
+            color: #333;
+            margin-top: 15px;
+            word-wrap: break-word;
+        }
+
+        #rescan {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            display: none; /* Hidden initially */
+        }
+
+        #rescan:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>QR Code Scanner</h1>
+        <video id="video" autoplay></video>
+        <div id="result">Scanning...</div>
+        <button id="rescan" onclick="rescanQR()">Rescan Another QR</button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const canvasElement = document.createElement('canvas');
+        const canvas = canvasElement.getContext('2d');
+        const resultElement = document.getElementById('result');
+        const rescanButton = document.getElementById('rescan');
+        let scanning = true;
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(stream) {
+            video.srcObject = stream;
+            video.setAttribute('playsinline', true); // Required for iOS
+            video.play();
+            requestAnimationFrame(tick);
+        });
+
+        function tick() {
+            if (scanning && video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvasElement.height = video.videoHeight;
+                canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+
+                if (code) {
+                    scanning = false; // Stop scanning
+                    video.pause(); // Freeze the camera
+
+                    const scannedData = code.data;
+
+                    if (isValidURL(scannedData)) {
+                        resultElement.innerHTML = `Scanned Result: <strong><a href="${scannedData}" target="_blank">${scannedData}</a></strong>`;
+                    } else {
+                        resultElement.innerHTML = `Scanned Result: <strong>${scannedData}</strong>`;
+                    }
+
+                    rescanButton.style.display = 'block'; // Show rescan button
+                } else {
+                    resultElement.innerText = 'Scanning...';
+                }
+            }
+            if (scanning) {
+                requestAnimationFrame(tick);
+            }
+        }
+
+        function rescanQR() {
+            scanning = true; // Resume scanning
+            rescanButton.style.display = 'none'; // Hide rescan button
+            resultElement.innerText = 'Scanning...';
+            video.play(); // Restart the video stream
+            requestAnimationFrame(tick); // Resume scanning loop
+        }
+
+        function isValidURL(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+    </script>
+</body>
+</html>
